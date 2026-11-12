@@ -1,0 +1,283 @@
+import { makeLevel, type LevelDef } from '../level.ts'
+
+// Level 27, chapter 6 precision peak: thorn floors and thorn roofs together, 1-wide stones at uneven heights,
+// hops whose hold length is measured (a roof caps them, a stone or a needle sets the floor), stomps that must be
+// tapped under thorns and held under open sky, a stepped zipper tube, colour curtains hung as windows,
+// inverted stepping stones and gravity columns between floor and roof stones. A lantern every few tiles, always
+// on rock (never a colour pillar, never upside-down), so a respawn is a standstill the next hops were solved from.
+export const thousandThorns: LevelDef = {
+  id: 'thousand-thorns',
+  name: 'Thousand Thorns',
+  build: () =>
+    makeLevel(418, ({ fill, mote, checkpoint, sign, beetle, pond, exit }) => {
+      const pit = (x0: number, x1: number) => {
+        fill(x0, 13, x1, 14, '.')
+        fill(x0, 14, x1, 14, '^')
+      }
+      const stone = (x: number, top: number, x1 = x) => fill(x, top, x1, 14, '#')
+      // thorn roof: rock from the ceiling down to row y - 1, thorns on row y
+      const roof = (x0: number, x1: number, y: number) => {
+        fill(x0, 1, x1, y - 1, '#')
+        fill(x0, y, x1, y, 'v')
+      }
+      const spikes = (x0: number, x1: number, y: number) => fill(x0, y, x1, y, '^')
+      const needle = (x: number, tip: number) => (stone(x, tip + 1), spikes(x, x, tip))
+      const col = (x: number, t: 'U' | 'D' | 'a' | 'c', y0: number, y1: number) => fill(x, y0, x, y1, t)
+      // colour pillar: solid only in its colour, a thorn under it for the wrong colour
+      const motes = (...ps: [number, number][]) => ps.forEach(([x, y]) => mote(x, y))
+      const pillar = (x: number, top: number, t: 'A' | 'C', x1 = x) => (fill(x, top, x1, 13, t), fill(x, 14, x1, 14, '^'))
+
+      // A. start
+      pond(2, 6)
+      sign(5, 9, 'Thousand Thorns: measure every hop')
+      checkpoint(9, 12)
+
+      // B. Briar Steps: 1-wide stones at uneven heights over a thorn bed
+      pit(12, 42)
+      stone(15, 12)
+      stone(19, 10)
+      checkpoint(19, 9)
+      stone(23, 11)
+      stone(26, 12, 27)
+      checkpoint(27, 11)
+      stone(31, 9)
+      stone(36, 11)
+      checkpoint(36, 10)
+      stone(40, 12)
+      checkpoint(40, 11)
+      checkpoint(44, 12)
+      motes([12, 10], [14, 10], [16, 9], [19, 8], [23, 10], [31, 8], [34, 8], [36, 9], [38, 9])
+
+      sign(43, 9, 'Thorns above and below: keep it low')
+
+      // C. The Seam: thorn bed below, thorn roof above, a narrow band of air that follows the stones
+      pit(46, 74)
+      roof(46, 60, 8)
+      roof(61, 68, 7)
+      roof(69, 74, 8)
+      stone(48, 12)
+      stone(52, 11)
+      checkpoint(52, 10)
+      stone(56, 12)
+      stone(59, 12, 60)
+      checkpoint(60, 11)
+      stone(63, 10)
+      stone(67, 11)
+      checkpoint(67, 10)
+      stone(71, 12)
+      checkpoint(71, 11)
+      checkpoint(76, 12)
+      motes([45, 9], [50, 9], [55, 10], [56, 11], [63, 9], [70, 10], [72, 9])
+
+      // D. Gauge pillars: climbs under thorn roofs (exact hold), thorn bumps between
+      roof(77, 79, 9)
+      spikes(78, 79, 12)
+      stone(80, 11, 81)
+      checkpoint(80, 10)
+      roof(80, 83, 7)
+      spikes(82, 84, 12)
+      stone(85, 9)
+      checkpoint(85, 8)
+      roof(85, 86, 6)
+      spikes(86, 89, 12)
+      roof(94, 98, 10)
+      spikes(95, 95, 12)
+      checkpoint(102, 12)
+      motes([80, 10], [85, 8], [86, 7], [92, 10], [98, 12])
+
+      sign(101, 8, 'Tap a stomp under thorns, hold it under open sky')
+
+      // E. Beetle Briars: stomps under thorn roofs (tap: a held bounce hits the roof), one held stomp up through a gap
+      pit(106, 134)
+      stone(109, 12)
+      beetle(109, 11)
+      roof(107, 113, 7)
+      stone(114, 11)
+      beetle(114, 10)
+      fill(117, 7, 121, 7, '#')
+      checkpoint(120, 6)
+      roof(117, 123, 4)
+      stone(124, 10, 126)
+      checkpoint(125, 9)
+      stone(130, 12)
+      beetle(130, 11)
+      roof(128, 133, 7)
+      checkpoint(139, 12)
+      motes([115, 7], [116, 6], [123, 7], [127, 8], [135, 11])
+
+      // F. Thorn Zipper: a stepped tube, thorns on floor and roof, gravity flips to dodge them
+      fill(140, 1, 173, 12, '#')
+      fill(140, 9, 149, 12, '.') // low tube
+      fill(150, 7, 163, 10, '.') // raised tube
+      fill(164, 9, 173, 12, '.') // low tube
+      col(141, 'D', 9, 12)
+      col(143, 'U', 9, 12)
+      spikes(146, 149, 12)
+      fill(155, 7, 156, 7, 'v')
+      col(158, 'D', 7, 10)
+      spikes(162, 162, 10)
+      fill(161, 7, 163, 7, 'v')
+      checkpoint(160, 10)
+      spikes(164, 164, 12)
+      checkpoint(166, 12)
+      col(168, 'U', 9, 12)
+      spikes(170, 172, 12)
+      col(173, 'D', 9, 12)
+      checkpoint(175, 12)
+      motes([146, 9], [149, 9], [154, 10], [156, 9], [159, 9], [162, 8], [164, 10], [174, 10], [175, 11])
+
+      sign(175, 8, 'Curtains hang as windows: your height picks your colour')
+
+      // G. Prism Windows: colour pillars over thorns; curtains hang as windows, so the height of each hop picks your colour
+      pit(177, 205)
+      pillar(178, 12, 'A')
+      col(180, 'c', 8, 10)
+      pillar(182, 12, 'C')
+      col(184, 'a', 9, 12)
+      pillar(186, 11, 'A')
+      col(188, 'c', 6, 8)
+      stone(190, 12, 191)
+      checkpoint(191, 11)
+      col(193, 'a', 9, 11)
+      pillar(195, 10, 'A')
+      col(197, 'c', 8, 12)
+      pillar(200, 12, 'C')
+      col(202, 'a', 7, 10)
+      pillar(204, 11, 'A')
+      checkpoint(207, 12)
+      motes([181, 10], [184, 9], [187, 9], [193, 9], [198, 9], [201, 9], [203, 9], [204, 10], [207, 10])
+
+      // H. Needles: thin stones tipped with thorns between low stones; arc over the tips, under the roof
+      pit(210, 240)
+      needle(212, 11)
+      stone(214, 12)
+      checkpoint(214, 11)
+      needle(216, 10)
+      roof(217, 218, 7)
+      stone(218, 11)
+      checkpoint(218, 10)
+      needle(220, 9)
+      roof(219, 221, 5)
+      stone(223, 11, 224)
+      checkpoint(223, 10)
+      needle(227, 10)
+      stone(229, 12)
+      checkpoint(229, 11)
+      needle(231, 10)
+      needle(232, 10)
+      stone(235, 11)
+      checkpoint(235, 10)
+      needle(238, 9)
+      roof(234, 236, 7)
+      checkpoint(242, 12)
+      motes([212, 9], [214, 9], [219, 7], [224, 7], [227, 8], [229, 11], [233, 8], [239, 8], [240, 9], [241, 11])
+
+      // I. Inverted Bramble: up on the roof, thorn studs on the road, hanging stones over a thorn recess,
+      //    thorn teeth below that cap every downward hop; full-height D columns close both ends
+      const rock = (x0: number, x1: number, y1: number) => fill(x0, 1, x1, y1, '#')
+      const recess = (x0: number, x1: number) => (fill(x0, 1, x1, 3, '.'), fill(x0, 1, x1, 1, 'v'))
+      pit(249, 280)
+      col(246, 'D', 1, 12)
+      col(248, 'U', 4, 12)
+      rock(247, 280, 3)
+      fill(256, 4, 256, 4, 'v')
+      recess(259, 265)
+      rock(261, 261, 5)
+      rock(264, 264, 4)
+      spikes(259, 262, 9)
+      stone(267, 9, 268)
+      checkpoint(267, 8)
+      col(269, 'U', 5, 8)
+      fill(275, 4, 275, 4, 'v')
+      recess(278, 280)
+      rock(279, 279, 6)
+      spikes(277, 280, 10)
+      col(281, 'D', 1, 12)
+      checkpoint(284, 12)
+      motes([248, 12], [254, 6], [260, 6], [264, 5], [267, 5], [274, 7], [275, 6], [279, 7], [282, 8], [283, 12])
+
+      // J. Bounce Tamer: tap the stomp under a low roof, hold it where the sky opens to reach a high stone
+      pit(289, 320)
+      stone(292, 12)
+      beetle(292, 11)
+      roof(289, 295, 7)
+      stone(297, 12)
+      beetle(297, 11)
+      stone(301, 8)
+      checkpoint(301, 7)
+      roof(300, 303, 4)
+      stone(306, 10)
+      beetle(306, 9)
+      roof(304, 309, 5)
+      stone(312, 12, 314)
+      checkpoint(313, 11)
+      stone(318, 12)
+      beetle(318, 11)
+      roof(316, 320, 7)
+      checkpoint(323, 12)
+      motes([299, 7], [301, 7], [309, 7], [313, 11], [314, 8])
+
+      // K. Prism Seam: colour stones in a thorn corridor, every gap a curtain, one gap with two
+      pit(327, 355)
+      roof(327, 355, 8)
+      pillar(330, 12, 'A')
+      col(332, 'c', 9, 13)
+      pillar(334, 11, 'C')
+      col(336, 'a', 9, 13)
+      pillar(338, 12, 'A')
+      col(340, 'c', 9, 13)
+      col(341, 'a', 9, 13)
+      pillar(343, 12, 'A')
+      stone(346, 12, 347)
+      checkpoint(347, 11)
+      col(349, 'c', 9, 13)
+      pillar(351, 11, 'C')
+      col(353, 'a', 9, 13)
+      pillar(355, 12, 'A')
+      checkpoint(359, 12)
+      motes([328, 9], [331, 10], [335, 9], [339, 9], [341, 9], [344, 10], [348, 10], [352, 9], [356, 10])
+
+      sign(358, 8, 'Gravity waits in the gaps')
+
+      // L. Flip Stones: 1-wide stones on the floor and hanging from a thorn roof; gravity columns in the gaps
+      //    throw you from one to the other. Full-height D columns close both ends.
+      pit(362, 391)
+      fill(362, 1, 391, 1, 'v')
+      col(361, 'D', 1, 12)
+      stone(364, 11)
+      checkpoint(364, 10)
+      col(366, 'U', 8, 10)
+      rock(368, 368, 4)
+      col(370, 'D', 5, 8)
+      stone(372, 11)
+      checkpoint(372, 10)
+      col(374, 'U', 8, 10)
+      rock(376, 376, 5)
+      col(378, 'D', 6, 9)
+      stone(380, 12, 381)
+      checkpoint(381, 11)
+      col(383, 'U', 8, 10)
+      rock(385, 385, 4)
+      col(387, 'D', 5, 8)
+      stone(389, 11)
+      checkpoint(389, 10)
+      col(392, 'D', 1, 12)
+      checkpoint(394, 12)
+      motes([363, 10], [366, 8], [370, 7], [374, 8], [378, 7], [381, 11], [382, 8], [384, 7], [385, 5], [391, 10])
+
+      // M. Last thorns: a low stone under a thorn roof, a needle, a curtain onto a cyan pillar, the gate
+      pit(398, 410)
+      stone(401, 12)
+      checkpoint(401, 11)
+      roof(399, 401, 9)
+      needle(403, 10)
+      stone(405, 11)
+      checkpoint(405, 10)
+      col(407, 'c', 7, 12)
+      pillar(409, 12, 'C')
+      pond(411, 415)
+      checkpoint(412, 12)
+      motes([399, 10], [402, 10], [405, 9], [409, 11])
+      exit(416, 12)
+    }, 'bramble'),
+}
