@@ -8,7 +8,8 @@ import tailwindcss from '@tailwindcss/vite'
 
 const config = defineConfig({
   resolve: { tsconfigPaths: true },
-  plugins: [devtools(), tailwindcss(), tanstackStart(), viteReact()],
+  // prerender: the game is all client-side, so ship static HTML (deployed to Netlify as a static site)
+  plugins: [devtools(), tailwindcss(), tanstackStart({ prerender: { enabled: true } }), viteReact()],
 })
 
 export default config
