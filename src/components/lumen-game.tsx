@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode, type CSSProperties } from 'react'
 import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react'
 import {
   ArrowLeft01Icon,
@@ -21,6 +21,7 @@ import {
   ReloadIcon,
   SkullIcon,
   SparklesIcon,
+  StarIcon,
   VolumeHighIcon,
   VolumeOffIcon,
 } from '@hugeicons/core-free-icons'
@@ -42,8 +43,6 @@ type Progress = { unlocked: number; last: number; best: Record<string, Best> }
 
 const PROGRESS_KEY = 'lumen-progress'
 const MUTE_KEY = 'lumen-muted'
-/** Temporary: open every built level regardless of progress (for playtesting). Set false to restore unlocking. */
-const UNLOCK_ALL_LEVELS = true
 
 const freshProgress = (): Progress => ({ unlocked: 1, last: 0, best: {} })
 const readProgress = (): Progress => {
@@ -75,7 +74,15 @@ const saveShop = (s: Shop) => {
   } catch {}
 }
 const bankedMotes = (p: Progress) => LEVELS.reduce((n, l) => n + (p.best[l.id]?.motes ?? 0), 0)
-const totalMotes = () => LEVELS.reduce((n, l) => n + l.build().motes.length, 0) // only for the ending screen
+let moteTotals: number[] | null = null // building every level is not free: do it once, on first use
+const moteTotal = (i: number) => (moteTotals ??= LEVELS.map((l) => l.build().motes.length))[i]
+const totalMotes = () => LEVELS.reduce((n, _, i) => n + moteTotal(i), 0)
+/** Stars for a finished run: 1 for reaching the gate, 2 for half the motes, 3 for every mote. */
+const starsFor = (motes: number, total: number) => (motes >= total ? 3 : motes * 2 >= total ? 2 : 1)
+const levelStars = (p: Progress, i: number) => {
+  const b = p.best[LEVELS[i].id]
+  return b ? starsFor(b.motes, moteTotal(i)) : 0
+}
 const spentMotes = (s: Shop) => s.owned.reduce((n, id) => n + skinById(id).price, 0)
 
 const saveProgress = (p: Progress) => {
@@ -339,13 +346,13 @@ export function LumenGame() {
       {/* HUD */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-2 pt-[max(0.75rem,env(safe-area-inset-top))] pr-[max(0.75rem,env(safe-area-inset-right))] pl-[max(0.75rem,env(safe-area-inset-left))] short:pt-[max(0.5rem,env(safe-area-inset-top))]">
         <div className="flex flex-wrap gap-1.5 sm:gap-2">
-          <Stat icon={Flag02Icon} label={`Level ${level + 1}: ${LEVELS[level].name}`} value={String(level + 1)} />
-          <Stat icon={SparklesIcon} label="Motes" value={`${hud.collected}/${hud.total}`} />
-          <Stat icon={Clock01Icon} label="Time" value={fmt(hud.time)} />
-          <Stat icon={SkullIcon} label="Deaths" value={String(hud.deaths)} />
+          <Stat icon={Flag02Icon} color={COLORS.amber} label={`Level ${level + 1}: ${LEVELS[level].name}`} value={String(level + 1)} />
+          <Stat icon={SparklesIcon} color="#fff4c2" label="Motes" value={`${hud.collected}/${hud.total}`} />
+          <Stat icon={Clock01Icon} color="#7fd8ff" label="Time" value={fmt(hud.time)} />
+          <Stat icon={SkullIcon} color="#ff8fa8" label="Deaths" value={String(hud.deaths)} />
           <Badge
             variant="outline"
-            className="h-7 gap-1.5 border-white/15 bg-black/40 px-2.5 backdrop-blur sm:h-8 sm:px-3"
+            className="h-7 gap-1.5 rounded-full border-2 border-white/12 bg-black/45 px-2 font-semibold shadow-[0_3px_0_rgb(0_0_0/0.4)] backdrop-blur sm:h-8 sm:px-3"
             style={{ color: phaseColor }}
             aria-label={`Colour: ${hud.phase}`}
           >
@@ -358,7 +365,7 @@ export function LumenGame() {
             <Button
               size="icon"
               variant="outline"
-              className="size-8 border-white/15 bg-black/40 backdrop-blur sm:size-9"
+              className="size-8 bg-black/45 backdrop-blur sm:size-9"
               onClick={toggleFullscreen}
               aria-label={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
               title="Fullscreen (F)"
@@ -369,7 +376,7 @@ export function LumenGame() {
           <Button
             size="icon"
             variant="outline"
-            className="size-8 border-white/15 bg-black/40 backdrop-blur sm:size-9"
+            className="size-8 bg-black/45 backdrop-blur sm:size-9"
             onClick={() => setMuted((m) => !m)}
             aria-label={muted ? 'Unmute' : 'Mute'}
             aria-pressed={muted}
@@ -381,7 +388,7 @@ export function LumenGame() {
             <Button
               size="icon"
               variant="outline"
-              className="size-8 border-white/15 bg-black/40 backdrop-blur sm:size-9"
+              className="size-8 bg-black/45 backdrop-blur sm:size-9"
               onClick={() => setScreen('paused')}
               aria-label="Pause"
             >
@@ -394,14 +401,31 @@ export function LumenGame() {
       {screen === 'playing' && <TouchControls input={gameRef.current.input} />}
 
       {screen !== 'playing' && (
-        <div className="absolute inset-0 grid place-items-center overflow-y-auto bg-black/45 px-[max(1rem,env(safe-area-inset-left))] pt-[max(3.5rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-[2px]">
-          <Card className={cn('w-full max-w-sm border-white/10 bg-[#11143a]/90 shadow-2xl short:max-w-md short:gap-3 short:py-4', (screen === 'levels' || screen === 'shop') && 'max-w-md short:max-w-xl')}>
+        <div className="absolute inset-0 grid place-items-center overflow-y-auto bg-[radial-gradient(ellipse_at_center,rgb(0_0_0/0.25),rgb(0_0_0/0.7))] px-[max(1rem,env(safe-area-inset-left))] pt-[max(3.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] backdrop-blur-[2px]">
+          <Card className={cn('game-panel w-full max-w-[26rem] short:max-w-md short:gap-3 short:py-4', (screen === 'levels' || screen === 'shop') && 'max-w-md short:max-w-xl')}
+            style={{ '--tint': gameRef.current.theme.sky[0] } as CSSProperties} // top of the level's sky
+          >
             {screen === 'menu' && (
               <>
                 <CardHeader>
-                  <CardTitle className="text-4xl font-extrabold tracking-tight short:text-3xl">
-                    Bloop<span style={{ color: COLORS.amber }}>.</span>
+                  <CardTitle className="game-title text-5xl font-bold tracking-tight drop-shadow-[0_4px_0_rgb(0_0_0/0.35)] short:text-4xl" aria-label="Bloop">
+                    {'Bloop'.split('').map((ch, i) => (
+                      <span key={i} style={{ animationDelay: `${i * 0.12}s` }}>
+                        {ch}
+                      </span>
+                    ))}
+                    <span style={{ color: COLORS.amber, animationDelay: '0.6s', textShadow: `0 0 16px ${COLORS.amber}` }}>.</span>
                   </CardTitle>
+                  {progress.unlocked > 1 && (
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      <Chip icon={Flag02Icon} color={COLORS.amber}>
+                        Level {progress.unlocked} of {LEVELS.length}
+                      </Chip>
+                      <Chip icon={StarIcon} color="#ffd84d">
+                        {LEVELS.reduce((n, _, i) => n + levelStars(progress, i), 0)} / {LEVELS.length * 3}
+                      </Chip>
+                    </div>
+                  )}
                   <CardDescription>
                     Guide a wisp through the night garden to the gate. Every mote you gather on the way adds to your score.
                   </CardDescription>
@@ -423,39 +447,42 @@ export function LumenGame() {
             {screen === 'levels' && (
               <>
                 <CardHeader>
-                  <CardTitle className="text-2xl">Levels</CardTitle>
-                  <CardDescription>
-                    {UNLOCK_ALL_LEVELS ? "All built levels are open for testing." : "Finish a level to open the next."} {LEVELS.length < PLANNED_LEVELS ? `${LEVELS.length} of ${PLANNED_LEVELS} built so far.` : `All ${PLANNED_LEVELS} levels.`}
-                  </CardDescription>
+                  <CardTitle className="flex items-center justify-between gap-2 text-3xl font-bold">
+                    Levels
+                    <Chip icon={StarIcon} color="#ffd84d" label="Stars earned">
+                      {LEVELS.reduce((n, _, i) => n + levelStars(progress, i), 0)} / {LEVELS.length * 3}
+                    </Chip>
+                  </CardTitle>
+                  <CardDescription>Reach the gate to open the next level. Half the motes earns a second star, every mote a third.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-5 gap-2 short:grid-cols-10">
+                  <div className="grid grid-cols-5 gap-2.5 short:grid-cols-10 short:gap-2">
                     {Array.from({ length: PLANNED_LEVELS }, (_, i) => {
                       const def = LEVELS[i]
-                      const open = !!def && (UNLOCK_ALL_LEVELS || i < progress.unlocked)
-                      const b = def && progress.best[def.id]
-                      const total = def && b ? def.build().motes.length : 0
+                      const open = !!def && i < progress.unlocked
+                      const stars = open ? levelStars(progress, i) : 0
                       return (
                         <button
                           key={i}
                           disabled={!open}
                           onClick={() => play(i)}
                           title={def ? (open ? def.name : 'Locked: finish the level before it') : 'Coming soon'}
-                          aria-label={def ? `Level ${i + 1}: ${def.name}${open ? '' : ' (locked)'}` : `Level ${i + 1}: coming soon`}
-                          className={cn(
-                            'flex aspect-square flex-col items-center justify-center rounded-lg border text-sm font-semibold transition-colors',
-                            open
-                              ? 'border-white/15 bg-white/5 hover:bg-white/15 focus-visible:ring-2 focus-visible:ring-ring'
-                              : 'border-white/5 bg-white/[0.02] text-white/25',
-                            i === level && open && 'border-[#ffb347]/70 bg-[#ffb347]/10',
-                          )}
+                          aria-label={def ? `Level ${i + 1}: ${def.name}${open ? (stars ? `, ${stars} of 3 stars` : '') : ' (locked)'}` : `Level ${i + 1}: coming soon`}
+                          data-state={!open ? 'locked' : i === level ? 'current' : stars ? 'done' : 'open'}
+                          className="game-tile flex aspect-square flex-col items-center justify-center gap-1 text-xl font-bold tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring short:gap-0.5 short:text-base"
                         >
-                          {open ? i + 1 : <HugeiconsIcon icon={LockIcon} className="size-3.5" />}
-                          {b ? (
-                            <span className="font-mono text-[10px] font-normal text-[#fff4c2]">
-                              {b.motes}/{total}
+                          {open ? i + 1 : <HugeiconsIcon icon={LockIcon} className="size-5 opacity-70 short:size-4" />}
+                          {open && (
+                            <span className="flex gap-px" aria-hidden>
+                              {[1, 2, 3].map((s) => (
+                                <HugeiconsIcon
+                                  key={s}
+                                  icon={StarIcon}
+                                  className={cn('size-3.5 short:size-2.5', s <= stars ? 'fill-[#ffd84d] text-[#ffd84d] drop-shadow-[0_0_3px_#ffd84d]' : 'text-white/20')}
+                                />
+                              ))}
                             </span>
-                          ) : null}
+                          )}
                         </button>
                       )
                     })}
@@ -466,18 +493,18 @@ export function LumenGame() {
             {screen === 'shop' && (
               <>
                 <CardHeader>
-                  <CardTitle className="flex items-center justify-between gap-2 text-2xl">
+                  <CardTitle className="flex items-center justify-between gap-2 text-3xl font-bold">
                     Wisp shop
-                    <span className="flex items-center gap-1.5 rounded-full border border-[#fff4c2]/30 bg-[#fff4c2]/10 px-3 py-1 font-mono text-base text-[#fff4c2]" aria-label={`${wallet} motes to spend`}>
-                      <HugeiconsIcon icon={SparklesIcon} className="size-4" /> {wallet}
-                    </span>
+                    <Chip icon={SparklesIcon} color="#fff4c2" label={`${wallet} motes to spend`}>
+                      {wallet}
+                    </Chip>
                   </CardTitle>
                   <CardDescription>
                     Motes you gather are banked here (your best per level). Your amber/cyan colour always shows as the glow and ring.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 short:grid-cols-5">
+                  <div className="grid grid-cols-2 gap-2.5 pt-2 sm:grid-cols-3 short:grid-cols-5">
                     {SKINS.map((sk) => {
                       const owned = shop.owned.includes(sk.id)
                       const equipped = shop.equipped === sk.id
@@ -485,24 +512,29 @@ export function LumenGame() {
                       return (
                         <div
                           key={sk.id}
-                          className={cn(
-                            'flex flex-col items-center gap-1.5 rounded-lg border p-2 text-center',
-                            equipped ? 'border-[#ffb347]/70 bg-[#ffb347]/10' : 'border-white/10 bg-white/5',
-                          )}
+                          data-state={equipped ? 'current' : undefined}
+                          className={cn('game-tile flex flex-col items-center gap-1.5 p-2 pb-2.5 text-center', !owned && short > 0 && 'opacity-75')}
                         >
-                          <BallPreview skin={sk} />
-                          <div className="text-sm font-semibold">{sk.name}</div>
-                          {equipped ? (
-                            <span className="flex h-7 items-center gap-1 text-xs text-[#ffb347]">
-                              <HugeiconsIcon icon={Tick02Icon} className="size-3.5" /> Equipped
+                          {equipped && (
+                            <span className="absolute -top-2.5 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-linear-to-b from-[#ffd27a] to-[#ff9f2e] px-2 py-0.5 text-[10px] font-bold tracking-wide text-[#3a1d00] uppercase shadow-[0_2px_0_#b5600f]">
+                              <HugeiconsIcon icon={Tick02Icon} className="size-3" /> Equipped
                             </span>
+                          )}
+                          {/* the wisp floats over a little glowing stand */}
+                          <div className="relative grid place-items-center">
+                            <span className="absolute bottom-0.5 h-2 w-10 rounded-[50%] bg-white/15 blur-[2px]" />
+                            <BallPreview skin={sk} />
+                          </div>
+                          <div className="text-base font-semibold">{sk.name}</div>
+                          {equipped ? (
+                            <span className="h-7" />
                           ) : owned ? (
-                            <Button size="xs" variant="outline" onClick={() => equip(sk)}>
+                            <Button size="sm" variant="outline" onClick={() => equip(sk)}>
                               Equip
                             </Button>
                           ) : (
-                            <Button size="xs" disabled={short > 0} onClick={() => buy(sk)} title={short > 0 ? `${short} more motes needed` : undefined}>
-                              <HugeiconsIcon icon={SparklesIcon} /> {sk.price}
+                            <Button size="sm" disabled={short > 0} onClick={() => buy(sk)} title={short > 0 ? `${short} more motes needed` : undefined} className="tabular-nums">
+                              <HugeiconsIcon icon={short > 0 ? LockIcon : SparklesIcon} /> {sk.price}
                             </Button>
                           )}
                         </div>
@@ -514,7 +546,7 @@ export function LumenGame() {
             )}
             {screen === 'paused' && (
               <CardHeader>
-                <CardTitle className="text-2xl">Paused</CardTitle>
+                <CardTitle className="text-3xl font-bold">Paused</CardTitle>
                 <CardDescription>
                   Level {level + 1}: {LEVELS[level].name}. Take a breath, the wisp will wait.
                 </CardDescription>
@@ -523,11 +555,25 @@ export function LumenGame() {
             {screen === 'won' && (
               <>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-2xl">
-                    <HugeiconsIcon icon={finale ? SunriseIcon : Award01Icon} className="size-6" style={{ color: COLORS.amber }} />
+                  <div className="flex justify-center gap-2 pb-1" aria-label={`${starsFor(hud.collected, hud.total)} of 3 stars`}>
+                    {[1, 2, 3].map((s) => (
+                      <HugeiconsIcon
+                        key={`${level}-${s}`}
+                        icon={StarIcon}
+                        className={cn(
+                          'size-11 animate-in duration-500 zoom-in-50 fill-mode-both short:size-8',
+                          s === 2 && '-translate-y-2 size-13 short:size-10',
+                          s <= starsFor(hud.collected, hud.total) ? 'fill-[#ffd84d] text-[#ffd84d] drop-shadow-[0_0_10px_#ffd84d]' : 'text-white/20',
+                        )}
+                        style={{ animationDelay: `${s * 0.18}s` }}
+                      />
+                    ))}
+                  </div>
+                  <CardTitle className="flex items-center justify-center gap-2 text-3xl font-bold">
+                    <HugeiconsIcon icon={finale ? SunriseIcon : Award01Icon} className="size-7" style={{ color: COLORS.amber }} />
                     {finale ? 'Dawn reached' : `Level ${level + 1} complete`}
                   </CardTitle>
-                  <CardDescription>
+                  <CardDescription className="text-center">
                     {finale && (
                       <span className="mb-1 block">
                         The wisp carried its light through all {PLANNED_LEVELS} levels and out into the morning. Thank you for playing.
@@ -647,23 +693,40 @@ function BallPreview({ skin }: { skin: Skin }) {
   return <canvas ref={ref} className="size-14" aria-hidden />
 }
 
-function Stat({ icon, label, value }: { icon: IconSvgElement; label: string; value: string }) {
+/** HUD counter: a chunky pill with its icon in a coloured bubble. */
+function Stat({ icon, label, value, color }: { icon: IconSvgElement; label: string; value: string; color: string }) {
   return (
     <Badge
       variant="outline"
-      className="h-7 gap-1 border-white/15 bg-black/40 px-2 font-mono text-xs text-white backdrop-blur sm:h-8 sm:gap-1.5 sm:px-3 sm:text-sm"
+      className="h-7 gap-1.5 rounded-full border-2 border-white/12 bg-black/45 py-0 pr-2.5 pl-0.5 text-xs font-semibold text-white tabular-nums shadow-[0_3px_0_rgb(0_0_0/0.4)] backdrop-blur sm:h-8 sm:pr-3 sm:text-sm"
       aria-label={label}
     >
-      <HugeiconsIcon icon={icon} className="size-3.5 opacity-80 sm:size-4" />
+      <span className="grid size-5 place-items-center rounded-full sm:size-6" style={{ background: `${color}33`, color }}>
+        <HugeiconsIcon icon={icon} className="size-3 sm:size-3.5" />
+      </span>
       {value}
     </Badge>
+  )
+}
+
+/** Small counter used in panel headers (stars, motes to spend, progress). */
+function Chip({ icon, color, label, children }: { icon: IconSvgElement; color: string; label?: string; children: ReactNode }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full border-2 px-2.5 py-0.5 text-sm font-semibold tabular-nums shadow-[0_3px_0_rgb(0_0_0/0.35)]"
+      style={{ color, borderColor: `${color}55`, background: `${color}1a` }}
+      aria-label={label}
+    >
+      <HugeiconsIcon icon={icon} className="size-4" style={{ fill: icon === StarIcon ? color : undefined }} />
+      {children}
+    </span>
   )
 }
 
 function Help({ keys, text }: { keys: string; text: string }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <kbd className="rounded border border-white/15 bg-white/5 px-1.5 py-0.5 font-mono text-xs">{keys}</kbd>
+      <kbd className="game-key px-2 py-0.5 font-sans text-xs font-semibold">{keys}</kbd>
       <span className="text-right text-muted-foreground">{text}</span>
     </div>
   )
@@ -671,9 +734,9 @@ function Help({ keys, text }: { keys: string; text: string }) {
 
 function Result({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
-    <div className={cn('rounded-md border border-white/10 bg-white/5 p-2', highlight && 'border-[#fff4c2]/40 bg-[#fff4c2]/10')}>
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="font-mono text-lg" style={highlight ? { color: '#fff4c2' } : undefined}>
+    <div className="game-tile p-2" data-state={highlight ? 'current' : undefined}>
+      <div className="text-xs font-medium text-muted-foreground">{label}</div>
+      <div className="text-xl font-bold tabular-nums" style={highlight ? { color: '#fff4c2' } : undefined}>
         {value}
       </div>
     </div>
